@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hızlı Matematik</title>
+
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Hızlı Matematik" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <meta name="theme-color" content="#0e1628" />
+
+  <style>
+    :root{
+      --bg:#0b1220; --card:#0f172a; --accent:#ffd166; --text:#e6eef8; --muted:#9fb0c7;
+      --ok:#22c55e; --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: radial-gradient(80% 80% at 50% 20%, #0e1a36 0%, #0b1220 60%);
+      color:var(--text);
+      padding:20px;
+    }
+    .app{
+      width:100%; max-width:480px; position:relative;
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.08));
+      border:1px solid rgba(255,255,255,0.06);
+      border-radius:16px; padding:24px;
+      box-shadow:0 10px 30px rgba(2,6,23,.5);
+    }
+    h1{font-size:22px; margin:0 0 16px 0; letter-spacing:.3px}
+    .row{display:flex; gap:12px; margin:12px 0}
+    input[type="number"]{
+      flex:1; padding:14px 16px; border-radius:12px; border:1px solid rgba(255,255,255,.12);
+      background:#0b1428; color:var(--text); font-size:18px; -webkit-appearance:none; appearance:none;
+    }
+    button{
+      padding:14px 16px; border-radius:12px; border:none; font-weight:600; font-size:16px;
+      background:var(--accent);
+    }
+    .result{
+      margin-top:14px; font-weight:600;
+    }
+    .ok{color:var(--ok)} .bad{color:var(--bad)}
+    .gear{
+      position:absolute; top:-6px; right:-6px; width:44px; height:44px; border-radius:12px;
+      display:grid; place-items:center; border:1px solid rgba(255,255,255,0.12);
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.08));
+    }
+    .gear button{background:transparent; border:none; font-size:22px; color:var(--text); padding:0}
+    dialog{
+      width:min(92vw,520px); border:none; border-radius:16px; padding:0; background:#0f172a; color:var(--text);
+      box-shadow:0 18px 60px rgba(0,0,0,.6);
+    }
+    .dlg-header{padding:16px 18px; border-bottom:1px solid rgba(255,255,255,.06); display:flex; justify-content:space-between; align-items:center}
+    .dlg-body{padding:18px}
+    .dlg-footer{padding:16px 18px; border-top:1px solid rgba(255,255,255,.06); display:flex; gap:10px; justify-content:flex-end}
+    textarea{
+      width:100%; min-height:120px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.12);
+      background:#0b1428; color:var(--text); font-size:15px; resize:vertical;
+    }
+    .pin-row{display:flex; gap:10px; align-items:center}
+    .pin-row input{width:110px; text-align:center}
+    .hint{color:var(--muted); font-size:13px; margin-top:8px}
+    a.link{color:#93c5fd; text-decoration:none}
+    .small{font-size:12px; color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card">
+      <h1>2 + 2 kaçtır?</h1>
+      <div class="row">
+        <input id="answer" type="number" inputmode="numeric" placeholder="Cevabını yaz" />
+        <button id="checkBtn">Kontrol et</button>
+      </div>
+      <div id="result" class="result"></div>
+      <p class="small">Ana ekrana ekleyip tam ekran kullanın. İnternetsiz de çalışır.</p>
+    </div>
+
+    <div class="gear"><button id="openSettings" aria-label="Ayarlar">⚙️</button></div>
+  </div>
+
+  <!-- Ayarlar (PIN korumalı) -->
+  <dialog id="pinDialog">
+    <div class="dlg-header">
+      <strong>Ayarlar • PIN</strong>
+      <button id="pinClose" aria-label="Kapat">✕</button>
+    </div>
+    <div class="dlg-body">
+      <div class="pin-row">
+        <label for="pinInput">PIN</label>
+        <input id="pinInput" type="password" inputmode="numeric" maxlength="4" placeholder="0000" />
+        <button id="pinOk">Giriş</button>
+      </div>
+      <div class="hint">Varsayılan PIN: <b>0000</b></div>
+    </div>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <div class="dlg-header">
+      <strong>Ayarlar</strong>
+      <button id="settingsClose" aria-label="Kapat">✕</button>
+    </div>
+    <div class="dlg-body">
+      <label for="msgInput">Doğru cevap mesajı</label>
+      <textarea id="msgInput" placeholder="Örn: Aferin! Doğru cevap."></textarea>
+      <div class="hint">Buraya yazdığınız metin, doğru cevap verildiğinde gösterilir.</div>
+    </div>
+    <div class="dlg-footer">
+      <button id="saveMsg">Kaydet</button>
+    </div>
+  </dialog>
+
+  <script>
+    // Varsayılan mesaj (kullanıcı değiştirebilir)
+    const DEFAULT_MESSAGE = "Aferin! Doğru cevap.";
+    const MESSAGE_KEY = "successMessage_v1";
+
+    function getMessage(){
+      return localStorage.getItem(MESSAGE_KEY) || DEFAULT_MESSAGE;
+    }
+    function setMessage(text){
+      localStorage.setItem(MESSAGE_KEY, text || DEFAULT_MESSAGE);
+    }
+
+    // UI bağlama
+    const answerEl = document.getElementById('answer');
+    const checkBtn = document.getElementById('checkBtn');
+    const resultEl = document.getElementById('result');
+    const openSettings = document.getElementById('openSettings');
+    const pinDialog = document.getElementById('pinDialog');
+    const settingsDialog = document.getElementById('settingsDialog');
+    const pinOk = document.getElementById('pinOk');
+    const pinClose = document.getElementById('pinClose');
+    const settingsClose = document.getElementById('settingsClose');
+    const msgInput = document.getElementById('msgInput');
+    const saveMsg = document.getElementById('saveMsg');
+    const pinInput = document.getElementById('pinInput');
+
+    // Kontrol et
+    function checkAnswer(){
+      const val = Number(answerEl.value);
+      if (Number.isNaN(val)) {
+        resultEl.textContent = "Lütfen bir sayı yaz.";
+        resultEl.className = "result bad";
+        return;
+      }
+      if (val === 4){
+        resultEl.textContent = getMessage();
+        resultEl.className = "result ok";
+      } else {
+        resultEl.textContent = "Yanlış, tekrar dene.";
+        resultEl.className = "result bad";
+      }
+    }
+    checkBtn.addEventListener('click', checkAnswer);
+    answerEl.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){ checkAnswer(); }
+    });
+
+    // Ayarlar açılışı (PIN)
+    openSettings.addEventListener('click', ()=>{
+      pinInput.value = "";
+      pinDialog.showModal();
+      setTimeout(()=>pinInput.focus(), 50);
+    });
+    pinClose.addEventListener('click', ()=> pinDialog.close());
+
+    pinOk.addEventListener('click', ()=>{
+      const pin = pinInput.value.trim();
+      if(pin === "0000"){
+        pinDialog.close();
+        // Mevcut mesajı yükle
+        msgInput.value = getMessage();
+        settingsDialog.showModal();
+        setTimeout(()=>msgInput.focus(), 50);
+      }else{
+        alert("PIN hatalı.");
+      }
+    });
+
+    settingsClose.addEventListener('click', ()=> settingsDialog.close());
+
+    saveMsg.addEventListener('click', ()=>{
+      setMessage(msgInput.value.trim());
+      settingsDialog.close();
+      resultEl.textContent = "Mesaj kaydedildi.";
+      resultEl.className = "result";
+      setTimeout(()=>{ resultEl.textContent = ""; }, 1200);
+    });
+
+    // PWA: Service worker
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", ()=>{
+        navigator.serviceWorker.register("./service-worker.js").catch(console.error);
+      });
+    }
+  </script>
+</body>
+</html>
